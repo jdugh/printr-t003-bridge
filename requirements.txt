@@ -1,0 +1,3 @@
+# Pillow dispose de roues adaptées à de nombreux environnements, mais ARMv6 peut nécessiter une installation système.
+Pillow>=10,<12
+types-qrcode>=8.0

@@ -1,0 +1,18 @@
+[Unit]
+Description=Printr vers ORGSTA T003 - passerelle ESC/POS TCP vers TSPL
+After=network.target bluetooth.target
+
+[Service]
+Type=simple
+User=__USER__
+WorkingDirectory=__WORKDIR__
+ExecStart=__WORKDIR__/.venv/bin/python -m printr_t003 serve
+Restart=on-failure
+RestartSec=4
+Environment=PYTHONUNBUFFERED=1
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+
+[Install]
+WantedBy=multi-user.target
