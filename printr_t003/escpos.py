@@ -32,8 +32,9 @@ class Renderer:
         self.underline = False
         self.inverse = False
         self.upside_down = False
-        self.double_w = False
-        self.double_h = False
+        # Multiplicateurs de taille de caractère (1 à 8), cf. GS ! / ESC !.
+        self.size_w = 1
+        self.size_h = 1
         self.font_a = ImageFont.truetype(cfg.font, cfg.font_size)
         # Font B : un peu plus petite/fine pour mieux coller à ESC/POS.
         self.font_b = ImageFont.truetype(cfg.font, max(10, int(round(cfg.font_size * 0.70))))
@@ -65,8 +66,8 @@ class Renderer:
         self.underline = False
         self.inverse = False
         self.upside_down = False
-        self.double_w = False
-        self.double_h = False
+        self.size_w = 1
+        self.size_h = 1
         self.font_mode = 0
         self.line_spacing = max(24, self.cfg.font_size + 6)
         self.area_left = 0
@@ -84,7 +85,7 @@ class Renderer:
         self.text.clear()
         left, area_width = self.text_area()
         font = self.current_font()
-        factor_x = 2 if self.double_w else 1
+        factor_x = self.size_w
         # Les cellules de la police A sont plus étroites que la police TTF
         # à hauteur équivalente. Les 42 colonnes PrintR tiennent sur 504 points.
         if self.area_left == 4 and self.area_width == 504:
@@ -93,7 +94,7 @@ class Renderer:
                 left += (self.cfg.width - 512) // 2
             if self.font_mode == 0:
                 factor_x *= 0.90
-        factor_y = 2 if self.double_h else 1
+        factor_y = self.size_h
         height = self.line_spacing * factor_y
 
         def fits(line):
@@ -224,7 +225,9 @@ class Renderer:
                     elif op == 51:
                         self.line_spacing = max(1, v)
                     elif op == 33:
-                        self.double_w = bool(v & 0x20); self.double_h = bool(v & 0x10)
+                        # ESC ! : double largeur (bit 5) / double hauteur (bit 4).
+                        self.size_w = 2 if v & 0x20 else 1
+                        self.size_h = 2 if v & 0x10 else 1
                     elif op == 100:
                         if self.text:
                             self.flush_line()
@@ -346,7 +349,10 @@ class Renderer:
                 elif op in (33, 66, 72, 104, 119, 102):
                     need(3); v = data[i + 2]; i += 3
                     if op == 33:
-                        self.double_w = bool(v & 0x10); self.double_h = bool(v & 1)
+                        # GS ! n : bits 4-6 = largeur - 1, bits 0-2 = hauteur - 1 (×1 à ×8).
+                        # PrintR : S=0x00, M=0x11, L=0x22, XL=0x33.
+                        self.size_w = ((v >> 4) & 0x07) + 1
+                        self.size_h = (v & 0x07) + 1
                     elif op == 66:
                         self.inverse = v != 0
                 elif op == 86:  # cut, ignored on T003 continuous paper

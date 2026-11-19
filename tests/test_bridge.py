@@ -27,6 +27,21 @@ class BridgeTests(unittest.TestCase):
         self.assertGreater(im.height, 0)
         self.assertEqual(im.width, 576)
 
+    def test_text_sizes(self):
+        # Tailles PrintR S/M/L/XL = GS ! 0x00/0x11/0x22/0x33 (zone PrintR 4/504).
+        def ink(size):
+            raw = b'\x1b@\x1dL\x04\x00\x1dW\xf8\x01\x1d!' + bytes([size]) + b'Hi\n'
+            box = Renderer(self.cfg).parse(raw).point(lambda v: 255 - v).getbbox()
+            return box[2] - box[0], box[3] - box[1]
+        sizes = [ink(v) for v in (0x00, 0x11, 0x22, 0x33)]
+        for k, (w, h) in enumerate(sizes[1:], start=2):
+            self.assertAlmostEqual(w / sizes[0][0], k, delta=0.35)
+            self.assertAlmostEqual(h / sizes[0][1], k, delta=0.35)
+        # Largeur et hauteur indépendantes.
+        w, h = ink(0x30)
+        self.assertGreater(w, 3 * sizes[0][0])
+        self.assertEqual(h, sizes[0][1])
+
     def test_split_and_backfeed(self):
         im = Image.new('1', (576, 1800), 1)
         blocks = list(batches(im, self.cfg))
