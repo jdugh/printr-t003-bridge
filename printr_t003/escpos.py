@@ -150,6 +150,9 @@ class Renderer:
                 left += (self.cfg.width - 512) // 2
             if self.font_mode == 0:
                 factor_x *= 0.90
+            else:
+                # Police B : PrintR remplit 56 colonnes de 9 points (504).
+                factor_x *= min(1.0, (area_width - 2) / (56 * font.getlength('0')))
         factor_y = self.size_h
         height = self.line_spacing * factor_y
 
@@ -161,11 +164,20 @@ class Renderer:
             canvas = Image.new('L', (self.cfg.width, height), 255)
             if line:
                 x0, y0, x1, y1 = font.getbbox(line)
-                layer = Image.new('L', (max(1, x1 - x0) + 2, max(1, y1 - y0) + 3), 255)
+                if self.inverse:
+                    # En inversé, le fond noir couvre toute la cellule de caractère
+                    # (comme une imprimante ESC/POS) : même hauteur de bandeau et
+                    # même ligne de base quel que soit le texte (accents, jambages).
+                    ascent, descent = font.getmetrics()
+                    band = min(self.line_spacing, ascent + descent + 4)
+                    layer_h, y_text = band, (band - ascent - descent) // 2
+                else:
+                    layer_h, y_text = max(1, y1 - y0) + 3, -y0
+                layer = Image.new('L', (max(1, x1 - x0) + 2, layer_h), 255)
                 pen = ImageDraw.Draw(layer)
-                pen.text((-x0, -y0), line, font=font, fill=0)
+                pen.text((-x0, y_text), line, font=font, fill=0)
                 if self.bold:
-                    pen.text((1 - x0, -y0), line, font=font, fill=0)
+                    pen.text((1 - x0, y_text), line, font=font, fill=0)
                 if self.underline:
                     pen.line((0, layer.height - 1, layer.width, layer.height - 1), fill=0)
                 size = (max(1, min(area_width, round(layer.width * factor_x))), layer.height * factor_y)

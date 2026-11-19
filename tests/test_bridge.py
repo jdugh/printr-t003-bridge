@@ -59,6 +59,23 @@ class BridgeTests(unittest.TestCase):
         twice = Renderer(self.cfg).parse(b'\x1b@A\n\x1dVA\x00\x1dV\x00B\n')
         self.assertEqual(twice.height, cut.height)
 
+    def test_inverse_band_height(self):
+        # Bandeaux PrintR (GS B 1) : même hauteur avec ou sans accent/jambage.
+        def band(text):
+            raw = b'\x1b@\x1dL\x04\x00\x1dW\xf8\x01\x1dB\x01' + text + b'\n'
+            box = Renderer(self.cfg).parse(raw).point(lambda v: 255 - v).getbbox()
+            return box[3] - box[1]
+        self.assertEqual(band(b'   LUNE   '), band(b'   \x90NIGME   '))
+        self.assertEqual(band(b'   LUNE   '), band(b'   gypj   '))
+
+    def test_font_b_56_columns(self):
+        # Petite police PrintR : 56 colonnes sur une seule ligne, sans recoupe.
+        line = b'Des 0 et des 1 : jamais trois pareils a la suite, autant'
+        self.assertEqual(len(line), 56)
+        r = Renderer(self.cfg)
+        im = r.parse(b'\x1b@\x1dL\x04\x00\x1dW\xf8\x01\x1bM\x01' + line + b'\n')
+        self.assertEqual(im.height, r.line_spacing)
+
     def test_split_and_backfeed(self):
         im = Image.new('1', (576, 1800), 1)
         blocks = list(batches(im, self.cfg))
