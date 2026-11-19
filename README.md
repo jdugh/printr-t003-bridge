@@ -6,7 +6,7 @@ Projet Python **neuf**, indépendant de CUPS et de `emupos` ; testé localement 
 
 `Printr (ESC/POS)` → `TCP:9100` → **décodeur ESC/POS** → `PNG 576 px` → découpage `600 px` → **TSPL2** → `USB /dev/usb/lp0` ou **Bluetooth RFCOMM**.
 
-**Important :** PrintR émet de l'ESC/POS et non un PNG. Le décodeur fourni supporte surtout `GS v 0` (raster), `ESC *` (bitmap colonnes), texte simple, alignement, styles et coupes ignorées. Des variantes (`GS ( L`, QR, codes-barres, commandes de positions, encodages) peuvent nécessiter des adaptations. **Ce n'est pas un émulateur ESC/POS exhaustif**. Les commandes inconnues déclenchent une erreur dans les logs, jamais une impression volontairement approximative. Pour un premier ticket réel, tester une impression Printr en simulation et comparer le PNG rendu.
+**Important :** PrintR émet de l'ESC/POS et non un PNG. Le décodeur fourni supporte surtout `GS v 0` (raster), `ESC *` (bitmap colonnes), texte simple, alignement, styles, et coupes (`GS V`) remplacées par une ligne pointillée avec ciseaux, puisque la T003 n'a pas de massicot ; la coupe finale du ticket n'est pas dessinée. Des variantes (`GS ( L`, QR, codes-barres, commandes de positions, encodages) peuvent nécessiter des adaptations. **Ce n'est pas un émulateur ESC/POS exhaustif**. Les commandes inconnues déclenchent une erreur dans les logs, jamais une impression volontairement approximative. Pour un premier ticket réel, tester une impression Printr en simulation et comparer le PNG rendu.
 
 La gestion Bluetooth est implémentée mais **non validée matériellement** : une liaison SPP RFCOMM doit être établie et le TSPL accepté par Bluetooth, ce qui reste à tester. BLE/GATT n'est pas inclus.
 

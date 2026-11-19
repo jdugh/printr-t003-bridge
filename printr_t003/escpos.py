@@ -13,6 +13,55 @@ class UnsupportedESCPos(ValueError):
     pass
 
 
+def cut_mark(width, height=72):
+    """Ligne pointillée avec ciseaux, comme l'aperçu PrintR du bloc « Coupe ».
+
+    Reprend l'icône « scissors » (grille 24×24) de l'aperçu web de PrintR,
+    dessinée en suréchantillonnage puis binarisée pour un trait net.
+    """
+    ss = 4
+    w, h = width * ss, height * ss
+    im = Image.new('L', (w, h), 255)
+    pen = ImageDraw.Draw(im)
+    # Ligne un peu haute : plus d'air sous la coupe, comme dans l'aperçu.
+    mid = 28 * ss
+    thick = 3 * ss
+    icon = 44 * ss
+    gap = 8 * ss
+    lead = 27 * ss  # deux tirets entiers avant les ciseaux
+    icon_x = lead + gap
+
+    def dashes(x0, x1):
+        dash, space = 10 * ss, 7 * ss
+        x = x0
+        while x < x1:
+            pen.rectangle((x, mid - thick // 2, min(x + dash, x1) - 1, mid + thick // 2 - 1), fill=0)
+            x += dash + space
+
+    dashes(0, lead)
+    dashes(icon_x + icon + gap, w)
+
+    scale = icon / 24
+    top = mid - icon // 2
+
+    def p(x, y):
+        return icon_x + x * scale, top + y * scale
+
+    stroke = round(1.9 * scale)
+    for cy in (7, 17):
+        x0, y0 = p(3, cy - 3)
+        x1, y1 = p(9, cy + 3)
+        pen.ellipse((x0, y0, x1, y1), outline=0, width=stroke)
+    for a, b in (((8.6, 8.5), (21, 16.5)), ((8.6, 15.5), (21, 7.5))):
+        pen.line((p(*a), p(*b)), fill=0, width=stroke)
+        for end in (a, b):
+            ex, ey = p(*end)
+            r = stroke / 2
+            pen.ellipse((ex - r, ey - r, ex + r, ey + r), fill=0)
+    small = im.resize((width, height), Image.Resampling.BOX)
+    return small.point(lambda v: 0 if v < 128 else 255)
+
+
 def raster_from_bits(payload, width_bytes, height):
     if width_bytes <= 0 or height <= 0 or len(payload) != width_bytes * height:
         raise ValueError('Raster ESC/POS incomplet')
@@ -46,6 +95,8 @@ class Renderer:
         self.qr_size = 6
         self.qr_ecc = qrcode.constants.ERROR_CORRECT_M
         self.unsupported = []
+        # GS V reçu : marque de coupe à dessiner avant le prochain contenu.
+        self.pending_cut = False
         # Zone imprimable courante (GS L / GS W), utilisée pour le rendu texte.
         self.area_left = 0
         self.area_width = self.cfg.width
@@ -74,6 +125,11 @@ class Renderer:
         self.area_width = self.cfg.width
 
     def append_part(self, image):
+        # Une coupe n'est matérialisée que si du contenu visible la suit :
+        # la coupe finale du ticket (ou des avances blanches seules) est ignorée.
+        if self.pending_cut and image.getextrema()[0] < 255:
+            self.pending_cut = False
+            self.append_part(cut_mark(self.cfg.width))
         height = self.height + image.height
         if height > self.cfg.max_height:
             raise ValueError(f'Ticket de {height} lignes, maximum {self.cfg.max_height}')
@@ -355,8 +411,11 @@ class Renderer:
                         self.size_h = (v & 0x07) + 1
                     elif op == 66:
                         self.inverse = v != 0
-                elif op == 86:  # cut, ignored on T003 continuous paper
+                elif op == 86:  # GS V : la T003 n'a pas de massicot -> marque de coupe
                     need(3); m = data[i + 2]; i += 3
+                    if self.text:
+                        self.flush_line()
+                    self.pending_cut = True
                     if m in (65, 66):
                         need(1); i += 1
                 elif op == 36:

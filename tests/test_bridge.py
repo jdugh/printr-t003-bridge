@@ -4,7 +4,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from PIL import Image
 from printr_t003.config import Config
-from printr_t003.escpos import Renderer, raster_from_bits, UnsupportedESCPos
+from printr_t003.escpos import Renderer, cut_mark, raster_from_bits, UnsupportedESCPos
 from printr_t003.tspl import normalize, batches
 
 
@@ -41,6 +41,23 @@ class BridgeTests(unittest.TestCase):
         w, h = ink(0x30)
         self.assertGreater(w, 3 * sizes[0][0])
         self.assertEqual(h, sizes[0][1])
+
+    def test_cut_mark(self):
+        # Bloc « Coupe » PrintR (GS V A 0) au milieu : marque pointillée + ciseaux.
+        base = Renderer(self.cfg).parse(b'\x1b@A\nB\n')
+        cut = Renderer(self.cfg).parse(b'\x1b@A\n\x1dVA\x00B\n')
+        self.assertGreater(cut.height, base.height)
+        mark = cut_mark(self.cfg.width)
+        self.assertEqual(cut.height, base.height + mark.height)
+        row = [mark.getpixel((x, 28)) for x in range(100, self.cfg.width)]
+        self.assertTrue(0.4 < row.count(0) / len(row) < 0.8)  # pointillés
+        # Coupe finale (ou suivie d'avances blanches seules) : rien à dessiner.
+        end = Renderer(self.cfg).parse(b'\x1b@A\nB\n\x1bd\x03\x1dVA\x00')
+        tail = Renderer(self.cfg).parse(b'\x1b@A\nB\n\x1bd\x03')
+        self.assertEqual(end.height, tail.height)
+        # Coupes consécutives : une seule marque.
+        twice = Renderer(self.cfg).parse(b'\x1b@A\n\x1dVA\x00\x1dV\x00B\n')
+        self.assertEqual(twice.height, cut.height)
 
     def test_split_and_backfeed(self):
         im = Image.new('1', (576, 1800), 1)
